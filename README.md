@@ -1,4 +1,5 @@
-# Segmentation-Method-for-Intracerebral-Hemorrhage
+<h1 align = "center"><b>Segmentation Method for Intracerebral Hemorrhage<b></h1>
+
 <p align="center">
   <img src="https://i.postimg.cc/0Qqg89yD/portada.jpg"> 
 </p>
