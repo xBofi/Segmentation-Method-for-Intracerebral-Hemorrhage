@@ -1,3 +1,4 @@
+#First of all I import all the necessary libraries
 import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -5,17 +6,17 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow import keras
 import numpy as np
 from PIL import Image
-import os, glob
+import glob
 import nibabel as nib
 import cv2
 import shutil
 import random
 
-
+#Here I mount my drive
 from google.colab import drive
 drive.mount('driveAndreu')
 
-
+#Now I create all the folders that I used during the proyect, u'll see that I declared folders that are not used in the code, but I used them manually in some cases.
 TFG = path = '/content/driveAndreu/MyDrive/TFG/'
 eval_path = os.path.join(path, 'evaluation')            #Folder which contains 30 TC images for evaluation.
 train_path = os.path.join(path, 'data_2')               # Folder which contains both, data and label of the training images.
@@ -66,12 +67,12 @@ independent_test = os.path.join(results, 'Patient Slices/Independent test')
 
 
 
-    
+#Now I begin with the thresholding
 
 # Find all .nii images in the imagesPath folder
 image_files = [f for f in os.listdir(imagePath) if f.endswith('.nii')]
 
-    # Threshold each image and save the results
+# Threshold each image and save the results
 for image_file in image_files:
   # Load the image
     img = nib.load(os.path.join(imagePath, image_file)).get_fdata()
@@ -90,7 +91,7 @@ for image_file in image_files:
     print(f'{image_file} processed and saved in {preprocessed_img}')
 
 
-# Find all .nii images in the images folder and show the 12th slice
+# Find all .nii images in the images folder and show the 12th slice (I do this because the lesion usually has a part in this slice number on the patients)
 imageFiles = os.listdir(preprocessed_img)
 for imageFile in imageFiles:
     
@@ -100,7 +101,7 @@ for imageFile in imageFiles:
     plt.title(os.path.basename(os.path.join(preprocessed_img, imageFile)))
     plt.show()
 
-
+#Now that the images are thresholded I make 2D slices of every patient
 #Slicing
 for file in os.listdir(preprocessed_img):
     nii_img = nib.load(os.path.join(preprocessed_img, file))
@@ -117,7 +118,8 @@ for file in os.listdir(preprocessed_img):
 #Now I will separate the images into different folders to train a better model.
 
 #The goal is to train the IA with images with hemorrhages, that's why I have a folder to store the images with smaller or non-hemorhages and another to store the bigger hemorrhages
-# Recorrer los archivos en la carpeta "path/label"
+
+#So in order to do this first of all I am going to remove all the slices with a lesion smaller than 400 pixels
 n = 0
 threshold = 400
 for filename in os.listdir(img_slices):
@@ -131,8 +133,6 @@ for filename in os.listdir(img_slices):
             valor_pixel = matriz_imagen[x, y]
             if valor_pixel > 100:
               contador += 1
-
-
     # If the image meets the threshold, copy it to the new folder
     if contador >= threshold:
         n += 1
@@ -165,10 +165,10 @@ for imageBatch in imageBatches:
 
     # Process each image in the batch
     for i, imageFile in enumerate(imageBatch):
-        # Verificar si hay un archivo con el mismo nombre en la carpeta maskPath
+        #Check if there is a file with the same name in the maskPath folder
         maskFile = os.path.join(slices_with_hemorrhages+"/label/label", imageFile)
         if os.path.exists(maskFile):
-            # Si existe un archivo con el mismo nombre en la carpeta maskPath, cargar ambas imágenes y mostrarlas
+            # If there is a file with the same name in the maskPath folder, load both images and display them
             img = Image.open(os.path.join(img_slices, imageFile))
             axs[i, 0].imshow(img, cmap='gray')
             axs[i, 0].set_title(os.path.basename(os.path.join(img_slices, imageFile)))
@@ -182,21 +182,30 @@ for imageBatch in imageBatches:
 
 #Now I 'll save the folder with all the preprocessed images, not just the ones with hemorrhages inside another folder ready to use on CNN
 
-# copiar archivos de imageSlices a all_data_preprocessed/data/data
+# In order to reorganize the data I copy the images from img_slice to all_data_preprocessed/data/data
 
 for filename in os.listdir(img_slices):
     src_path = os.path.join(img_slices, filename)
     dst_path = os.path.join(all_img_prep, filename)
     shutil.copyfile(src_path, dst_path)
     
-# copiar archivos de maskSlice a all_data_preprocessed/label/label
+# In order to reorganize the data I copy the images from img_slice to all_data_preprocessed/label/label
 for filename in os.listdir(mask_slices):
     src_path = os.path.join(mask_slices, filename)
     dst_path = os.path.join(all_mask_org, filename)
     shutil.copyfile(src_path, dst_path)
 
-
+#Iuse this function to recount the images in each folder, it sometimes happens that the images doesn't copy due to connection problems or Google server problems
 def count_images_in_folder(folder_path):
+    """
+        Counts the number of valid images in the specified folder.
+
+   Args:
+       folder_path (str): Path to the folder containing the images.
+
+   Returns:
+        int: Number images found in the folder.
+"""
     count = 0
     for filename in os.listdir(folder_path):
         try:
@@ -211,7 +220,7 @@ count_images_in_folder(img_slices_hemo)
 count_images_in_folder(all_img_prep)
 
 
-
+#Now I organize all the images in patients folders
 # source folder path
 source_folder = all_img_prep
 
@@ -237,7 +246,7 @@ source_folder = all_mask_org
 # iterate through each file in the source folder
 for filename in os.listdir(source_folder):
     
-# extract the patient number and slice number from the file name
+# extract the patient and slice numbers from the file name
     patient_num, slice_num = filename.split('_')
     patient_folder = os.path.join(patient_mask, patient_num)
 
@@ -252,9 +261,9 @@ for filename in os.listdir(source_folder):
 
 
 
- # Iterate through each patient folder in the general folder
+ # Iterate through each patient folder
 for patient_folder in os.listdir(patient_img):
-    # Determine whether to copy the patient folder to the train or test folder
+    # Determine whether to copy the patient folder to the train or test folder(80% to train and 20% to test)
     if random.random() < 0.8:
         destination_folder = os.path.join(patient_img_train, patient_folder)
         destination_label_folder = os.path.join(patient_mask_train, patient_folder)
@@ -284,19 +293,21 @@ num_folders = len([item for item in items if os.path.isdir(os.path.join(director
 print(f"The directory '{directory}' contains {num_folders} folders.")
 
 
-# Obtiene una lista de todos los archivos en la carpeta de imágenes
+# Get a list of all files in the images folder
 files = os.listdir(img_slices_hemo)
 
-# Mezcla los archivos aleatoriamente
+# Shuffle files randomly
 random.shuffle(files)
 
-# Calcula el número de archivos para la división en train y test
+# Calculate the number of files for the division in train and test
 num_train = int(0.8 * len(files))
 num_test = len(files) - num_train
 
-print(num_train)
-print(num_test)
-# Copia los archivos de imágenes y máscaras a las carpetas correspondientes
+print(num_train)#78
+print(num_test)#17
+
+
+# Copy the image and skin files to the corresponding folders
 for i, file in enumerate(files):
   print(i)
   if os.path.exists(os.path.join(img_slices_hemo, file) and os.path.join(mask_slices_hemo, file)):
@@ -312,6 +323,16 @@ for i, file in enumerate(files):
 
 
 def copy_images(source_folder, destination_folder):
+    """
+    Copies image files from the source folder to the destination folder.
+
+    Args:
+        source_folder (str): Path to the folder containing the source images.
+        destination_folder (str): Path to the folder where the images will be copied.
+
+    Returns:
+        None
+    """
     # Create the destination folder if it doesn't exist
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
@@ -319,13 +340,13 @@ def copy_images(source_folder, destination_folder):
     # Get all the files in the source folder
     files = os.listdir(source_folder)
 
-    # Iterate over the files and copy only the images
+    # Iterate over the files and copy the images
     for file in files:
         source_path = os.path.join(source_folder, file)
         destination_path = os.path.join(destination_folder, file)
 
         # Check if the file is an image
-        if os.path.isfile(source_path) and file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+        if os.path.isfile(source_path) and file.lower().endswith(('.png', '.jpg', '.jpeg')):
             shutil.copy2(source_path, destination_path)
             print(f"Copied: {file}")
 
@@ -333,8 +354,17 @@ def copy_images(source_folder, destination_folder):
 
 copy_images(os.path.join(results, 'train/label/label'), os.path.join(TFG, 'Last training/label/label'))
 
-
+#I had problems with the image names, so i used this function to rectify the names
 def extract_digits_from_images(folder_path):
+    """
+    Extracts the unique first three digits from image filenames in the specified folder.
+
+    Args:
+        folder_path (str): Path to the folder containing the images.
+
+    Returns:
+        set: Set of unique first three digits extracted from the filenames.
+    """
     unique_digits = set()
 
     # Obtener la lista de archivos en la carpeta
@@ -357,7 +387,17 @@ unique_digits = extract_digits_from_images(os.path.join(TFG, 'Last training/data
 print("Número de elementos en la lista:", len(unique_digits))
 
 
-def extract_digits_from_images(folder_path):
+#Since at this point I didn't take into account that I shouldn't have slices of the same patient in train and test, I had to remove the images from here
+def extract_last_20(folder_path):
+    """
+    Extracts the last 20% of image filenames in the specified folder based on their numeric prefixes.
+
+    Args:
+        folder_path (str): Path to the folder containing the images.
+
+    Returns:
+        list: List of numeric prefixes of the removed images.
+    """
     unique_digits = []
 
     # Obtener la lista de archivos en la carpeta
@@ -392,12 +432,11 @@ def extract_digits_from_images(folder_path):
 
     return removed_digits
 
-# Ejemplo de uso:
 folder_path = os.path.join(TFG, 'Last training/data/data')
 
-removed_digits = extract_digits_from_images(folder_path)
+removed_digits = extract_last_20(folder_path)
 
-# Imprimir los números de las imágenes eliminadas
+# Print the number of the deleted images
 print("Números de las imágenes eliminadas:", removed_digits)
 
 from collections import OrderedDict
@@ -405,25 +444,25 @@ print("Números de las imágenes eliminadas:", list(OrderedDict.fromkeys(removed
 
 
 def copy_folders_with_numbers(source_dir, destination_dir, numbers):
-    # Obtener la lista de carpetas en el directorio fuente
+    # Get list of folders in source directory
 
-    # Copiar las carpetas al directorio de destino
+    # Copy the folders to the destination directory
     for n in numbers:
         source_path = os.path.join(source_dir, '0' + str(n))
         destination_path1 = os.path.join(destination_dir,'0' + str(n))
         destination_path = os.path.join(destination_path1,'0' + str(n))
 
 
-        # Copiar la carpeta y su contenido
+        # Copy the folder and its contents
         shutil.copytree(source_path, destination_path)
 
         print(f"Copiada la carpeta: {n}")
 
     print("Copia de carpetas completada.")
 
-# Ejemplo de uso:
+
 source_dir = os.path.join(results, "Patient Slices/general/data/data")
 destination_dir = os.path.join(TFG, "Last testing/data")
 numbers = [82, 83, 84, 85, 86, 87, 88, 89, 90, 92, 93, 95, 96, 97, 98, 99]
-
+#The number 100 was addressed manually, even though it could have been done here
 copy_folders_with_numbers(source_dir, destination_dir, numbers)
