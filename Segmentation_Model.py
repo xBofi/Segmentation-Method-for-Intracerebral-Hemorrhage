@@ -1,3 +1,6 @@
+#Now I am going to continue with the model construction, all the libraries needed are in the preprocessing script.
+#The original script was divided to help the correction
+
 # Define constants
 SEED = 909
 BATCH_SIZE_TRAIN = 2
@@ -21,6 +24,17 @@ NUM_OF_EPOCHS = 100
 
 
 def create_segmentation_generator_train(img_path, msk_path, BATCH_SIZE):
+      """
+    Creates a segmentation generator for training, which yields batches of augmented images and masks.
+
+    Args:
+        img_path (str): Path to the directory containing the input images.
+        msk_path (str): Path to the directory containing the corresponding masks.
+        BATCH_SIZE (int): Batch size for the generator.
+
+    Returns:
+        zip: A zip object containing the augmented images and masks.
+    """
     data_gen_args = dict(rescale=1./255
 #                      ,featurewise_center=True,
 #                      featurewise_std_normalization=True,
@@ -35,8 +49,19 @@ def create_segmentation_generator_train(img_path, msk_path, BATCH_SIZE):
     msk_generator = datagen.flow_from_directory(msk_path, target_size=IMG_SIZE, class_mode=None, color_mode='grayscale', batch_size=BATCH_SIZE, seed=SEED)
     return zip(img_generator, msk_generator)
 
-# Remember not to perform any image augmentation in the test generator!
+
 def create_segmentation_generator_test(img_path, msk_path, BATCH_SIZE):
+    """
+    Creates a segmentation generator for testing, which yields batches of images and masks without augmentation.
+
+    Args:
+        img_path (str): Path to the directory containing the input images.
+        msk_path (str): Path to the directory containing the corresponding masks.
+        BATCH_SIZE (int): Batch size for the generator.
+
+    Returns:
+        zip: A zip object containing the images and masks.
+    """
     data_gen_args = dict(rescale=1./255)
     datagen = ImageDataGenerator(**data_gen_args)
     
@@ -51,6 +76,15 @@ test_generator = create_segmentation_generator_test(data_dir_test_image, data_di
 
 
 def display(display_list):
+      """
+    Displays a list of images in a grid format.
+
+    Args:
+        display_list (list): List of images to be displayed.
+
+    Returns:
+        None
+    """
     plt.figure(figsize=(15,15))
     
     title = ['Input Image', 'True Mask', 'Predicted Mask']
@@ -63,6 +97,16 @@ def display(display_list):
 
       
 def show_dataset(datagen, num=1):
+    """
+    Displays a specified number of images and masks from a given data generator.
+
+    Args:
+        datagen (Generator): Data generator yielding image-mask pairs.
+        num (int): Number of images to display. Default is 1.
+
+    Returns:
+        None
+    """
     for i in range(0,num):
         image,mask = next(datagen)
         display([image[0], mask[0]])
@@ -73,6 +117,21 @@ show_dataset(train_generator, 2)
 
 
 def unet(n_levels, initial_features=32, n_blocks=2, kernel_size=3, pooling_size=2, in_channels=1, out_channels=1):
+     """
+    Creates a U-Net model with the specified number of levels and parameters.
+
+    Args:
+        n_levels (int): Number of levels in the U-Net.
+        initial_features (int): Number of initial features for the convolutional layers. Default is 32.
+        n_blocks (int): Number of convolutional blocks per level. Default is 2.
+        kernel_size (int): Kernel size for the convolutional layers. Default is 3.
+        pooling_size (int): Pooling size for the max pooling layers. Default is 2.
+        in_channels (int): Number of input channels. Default is 1.
+        out_channels (int): Number of output channels. Default is 1.
+
+    Returns:
+        keras.Model: U-Net model.
+    """
     inputs = keras.layers.Input(shape=(IMAGE_HEIGHT, IMAGE_WIDTH, in_channels))
     x = inputs
     
@@ -102,28 +161,41 @@ def unet(n_levels, initial_features=32, n_blocks=2, kernel_size=3, pooling_size=
   
   
   
+# Calculate the number of steps per epoch for training and testing data
 EPOCH_STEP_TRAIN = NUM_TRAIN // BATCH_SIZE_TRAIN
 EPOCH_STEP_TEST = NUM_TEST // BATCH_SIZE_TEST
 
+# Create a U-Net model with 4 classes
 model = unet(4)
+
+# Compile the model with Adam optimizer, binary crossentropy loss, and accuracy metric
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
+# Print the summary of the model
 model.summary()
 
+# Train the model using a generator for training data
+# Set the number of steps per epoch for training and testing data
+# Set the validation data and the number of validation steps
+# Set the number of epochs
 model.fit_generator(generator=train_generator, 
                     steps_per_epoch=EPOCH_STEP_TRAIN, 
                     validation_data=test_generator, 
                     validation_steps=EPOCH_STEP_TEST,
-                   epochs=NUM_OF_EPOCHS)
+                    epochs=NUM_OF_EPOCHS)
 
-
+# Save the trained model to a specified directory
 model.save(os.path.join(TFG, 'Model/1'))
+
+# Load the saved model
 model = tf.keras.models.load_model(os.path.join(TFG, 'Model/1'))
 
-
+# Set the directories for the test image and mask data
 data_dir_test_image = os.path.join(TFG, 'Last testing/data')
 data_dir_test_mask = os.path.join(TFG, 'Last testing/label')
 
+
+#I Create a test generator for each patient
 test_generator_patient082 = create_segmentation_generator_test(os.path.join(data_dir_test_image, '082'), os.path.join(data_dir_test_mask, '082'), 1)
 test_generator_patient083 = create_segmentation_generator_test(os.path.join(data_dir_test_image, '083'), os.path.join(data_dir_test_mask, '083'), 1)
 test_generator_patient084 = create_segmentation_generator_test(os.path.join(data_dir_test_image, '084'), os.path.join(data_dir_test_mask, '084'), 1)
@@ -143,6 +215,19 @@ test_generator_patient099 = create_segmentation_generator_test(os.path.join(data
 test_generator_patient100 = create_segmentation_generator_test(os.path.join(data_dir_test_image, '100'), os.path.join(data_dir_test_mask, '100'), 1)
 
 def show_prediction2(datagen, num=1, name = None):
+        """
+    Displays predictions and calculates evaluation metrics for a specified number of images using a given data generator.
+
+    Args:
+        datagen (Generator): Data generator yielding image-mask pairs.
+        num (int): Number of images to display and evaluate. Default is 1.
+        name (str): Name of the patient. Default is None.
+
+    Returns:
+        numpy.ndarray: Tensor of predicted masks.
+        float: Dice coefficient for the patient.
+        float: Percentage of false positives.
+    """
     tensor = np.empty((512, 512, num))
     TP = 0
     FP = 0
@@ -173,20 +258,25 @@ def show_prediction2(datagen, num=1, name = None):
     return tensor, d, (FP)/(512*512*num)*100
   
   
-  
+ # Create empty lists to store image data and evaluation metrics
 image_vector = []
 nifti_img = []
 true_mask = []
 dice_coefficient = []
 false_positives = []
 
-
+# Load the true mask from the specified path and add it to the true_mask list
 true_mask.append(nib.load(os.path.join(maskPath, '082.nii')))
+
+# Call the show_prediction2 function to make a prediction and obtain the tensor, dice coefficient, and false positives
 tensor, dice, FP = show_prediction2(test_generator_patient082, 33, '082')
+
+# Add the tensor, dice coefficient, and false positives to their respective lists
 image_vector.append(tensor)
 dice_coefficient.append(dice)
 false_positives.append(FP)
 
+#Now the same with every patient
 true_mask.append(nib.load(os.path.join(maskPath, '083.nii')))
 tensor, dice, FP = show_prediction2(test_generator_patient083, 32, '083')
 image_vector.append(tensor)
@@ -282,38 +372,50 @@ tensor, dice, FP = show_prediction2(test_generator_patient100, 30, '100')
 image_vector.append(tensor)
 dice_coefficient.append(dice)
 false_positives.append(FP)
-
+# Define a list of classes
 classes = [82, 83, 84, 85, 86, 87, 88, 89, 90, 92, 93, 95, 96, 97, 98, 99, 100]
 
+# Loop over the image_vector list
 for i in range(len(image_vector)):
-  nifti_img.append(nib.Nifti1Image(image_vector[i],true_mask[i].affine, true_mask[i].header))
+    # Create a NIfTI image using the image_vector, affine, and header from the corresponding true_mask
+    nifti_img.append(nib.Nifti1Image(image_vector[i], true_mask[i].affine, true_mask[i].header))
 
+# Define the output directory for the NIfTI files
 output_nii_file = os.path.join(TFG + '/Volums')
 
+# Loop over the nifti_img list
 for i in range(len(nifti_img)):
-    # Convert the integer to a string and prepend '0'
+    # Convert the class integer to a string and prepend '0'
     class_str = '0' + str(classes[i])
-    # Guardar la imagen NIfTI en disco
+    # Save the NIfTI image to disk using the class string as the filename
     nib.save(nifti_img[i], os.path.join(output_nii_file, class_str))
     
-    
+# Print the mean of the dice_coefficient list
 print(np.mean(dice_coefficient))
+
+# Print the dice_coefficient list
 print(dice_coefficient)
 
+# Print the mean of the false_positives list
 print(np.mean(false_positives))
+
+# Print the false_positives list
 print(false_positives)
 
-
+# Define folder paths
 folder_path = os.path.join(TFG, 'Volums')
 label_folder_path = os.path.join(TFG, 'data_2/label')
+
+# Initialize variables for accumulation
 acumulated_dice = 0
 acumulated_coincidence = 0
-
 num_files = 0
 
 # Iterate over files in the folder
 for filename in os.listdir(folder_path):
+    # Check if the file has the .nii extension
     if filename.endswith('.nii'):
+        # Create file paths for the label and volume files
         nii_file1 = os.path.join(label_folder_path, filename)
         nii_file2 = os.path.join(folder_path, filename)
 
@@ -325,7 +427,7 @@ for filename in os.listdir(folder_path):
         A_data = A.get_fdata().astype(bool)
         B_data = B.get_fdata().astype(bool)
 
-        # Calculate true positives, false positives, and false negatives
+        # Calculate true positives, false positives, false negatives, and true negatives
         TP = np.count_nonzero(A_data & B_data)
         FP = np.count_nonzero(B_data & ~A_data)
         FN = np.count_nonzero(A_data & ~B_data)
@@ -341,6 +443,7 @@ for filename in os.listdir(folder_path):
 
         num_files += 1
 
+        # Print the evaluation metrics for each file
         print(f"File: {filename}")
         print(f"Índice DICE: {dice_coefficient}")
         print(f"Percentage of coincidence: {coincidence}")
@@ -350,8 +453,11 @@ for filename in os.listdir(folder_path):
         print(f"True negative: {TN}")
         print("---------------------")
 
+# Check if any files were processed
 if num_files > 0:
+    # Calculate and print the average Dice coefficient and average percentage of coincidence
     print(f"Average Dice coefficient: {acumulated_dice / num_files}")
     print(f"Average percentage of coincidence: {acumulated_coincidence / num_files}")
 else:
+    # Print a message if no files were found in the folder
     print("No files found in the folder.")
