@@ -444,7 +444,17 @@ print("Números de las imágenes eliminadas:", list(OrderedDict.fromkeys(removed
 
 
 def copy_folders_with_numbers(source_dir, destination_dir, numbers):
-    # Get list of folders in source directory
+     """
+    Copies folders with specific numbers from the source directory to the destination directory.
+
+    Args:
+        source_dir (str): Path to the source directory containing the folders.
+        destination_dir (str): Path to the destination directory where the folders will be copied.
+        numbers (list): List of numbers representing the folders to be copied.
+
+    Returns:
+        None
+    """
 
     # Copy the folders to the destination directory
     for n in numbers:
